@@ -33,23 +33,23 @@ class OtpMail extends Mailable
     /**
      * Get the message content definition.
      */
-    // public function content(): Content
-    // {
-    //     return new Content(
-    //         markdown: 'mail.otp-mail',
-    //     );
-    // }
+    public function content(): Content
+    {
+        return new Content(
+            markdown: 'mail.otp-mail',
+        );
+    }
 
-    public function build()
-{
-    return $this
-        ->subject('Verify Your Account')
-        ->view('emails.otp')
-        ->with([
-            'otp' => $this->otp,
-            'expiresIn' => 10,
-        ]);
-}
+//     public function build()
+// {
+//     return $this
+//         ->subject('Verify Your Account')
+//         ->view('emails.otp')
+//         ->with([
+//             'otp' => $this->otp,
+//             'expiresIn' => 10,
+//         ]);
+// }
 
     /**
      * Get the attachments for the message.
