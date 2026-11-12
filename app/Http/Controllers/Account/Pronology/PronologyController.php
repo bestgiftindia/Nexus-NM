@@ -7,5 +7,7 @@ use Illuminate\Http\Request;
 
 class PronologyController extends Controller
 {
-    //
+    function index(){
+        return view('account.pronology.create');
+    }
 }

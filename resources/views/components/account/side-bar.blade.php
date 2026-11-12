@@ -60,6 +60,13 @@
                                     <span class="menu-text" title="Relationship Report" data-lang="layouts-scrollable">Relationship Report</span>
                                 </a>
                             </li>
+
+                            <li class="side-nav-item">
+                                <a href="{{ route('account.pronology.index') }}" class="side-nav-link">
+                                    <span class="menu-text" title="Name Report" data-lang="layouts-scrollable">Name Report</span>
+                                </a>
+                            </li>
+
                         </ul>
                     </div>
                 </li>
