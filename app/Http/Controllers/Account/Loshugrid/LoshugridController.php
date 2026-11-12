@@ -8,7 +8,9 @@ use App\Http\Requests\Loshugrid\LoshugridRequest;
 use App\Models\Loshugrid\LoshuGrid;
 use App\Services\ActivityLogService;
 use App\Services\flashService;
+use App\Services\Login\LoginService;
 use App\Services\Loshugrid\LoshugridService;
+use App\Services\Loshugrid\ReportService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -119,6 +121,7 @@ class LoshugridController extends Controller
                 $editUrl = route('account.loshugrid.edit', ['loshugrid' => $row->id]);
                 $infoUrl = route('account.loshugrid.info', ['loshugrid' => $row->id]);
                 $deleteUrl = route('account.loshugrid.destroy', ['loshugrid' => $row->id]);
+                $generatePdf = route('account.loshugrid.generate.pdf', ['loshugrid' => $row->id]);
 
                 $html = '';
 
@@ -147,7 +150,7 @@ class LoshugridController extends Controller
 
                 // Generate Report
                 $html .= '<li>
-                            <a class="dropdown-item" href="' . $editUrl . '">
+                            <a class="dropdown-item" href="' . $generatePdf . '">
                                 <i data-lucide="file-text" class="me-1"></i>
                                 Generate Report
                             </a>
@@ -180,4 +183,16 @@ class LoshugridController extends Controller
 
             ->toJson();
     }
+
+    function generate(LoshuGrid $loshugrid)
+    {
+        $generateReportId = $loshugrid->id;
+        $pdf = new ReportService(
+            app(LoshugridService::class),
+            app(LoginService::class),
+            $generateReportId
+        );
+        $pdf->generatePDF();
+    }
+
 }
