@@ -44,7 +44,7 @@ class OtpMail extends Mailable
 {
     return $this
         ->subject('Verify Your Account')
-        ->view('emails.otp')
+        ->view('mail.otp-mail')
         ->with([
             'otp' => $this->otp,
             'expiresIn' => 10,

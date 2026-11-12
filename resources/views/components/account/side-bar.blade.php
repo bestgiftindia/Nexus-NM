@@ -56,18 +56,8 @@
                                 </a>
                             </li>
                             <li class="side-nav-item">
-                                <a href="{{ route('account.pronology.index') }}" class="side-nav-link">
-                                    <span class="menu-text" title="Pronology Software" data-lang="layouts-scrollable">Pronology Software</span>
-                                </a>
-                            </li>
-                            <li class="side-nav-item">
-                                <a href="{{ route('account.mobile.basic.index') }}" class="side-nav-link">
-                                    <span class="menu-text" title="Basic Mobile Numerology" data-lang="layouts-scrollable">Basic Mobile Numerology</span>
-                                </a>
-                            </li>
-                            <li class="side-nav-item">
-                                <a href="{{ route('account.mobile.advance.index') }}" class="side-nav-link">
-                                    <span class="menu-text" title="Advance Mobile Numerology" data-lang="layouts-scrollable">Advance Mobile Numerology</span>
+                                <a href="{{ route('account.relationship.index') }}" class="side-nav-link">
+                                    <span class="menu-text" title="Relationship Report" data-lang="layouts-scrollable">Relationship Report</span>
                                 </a>
                             </li>
                         </ul>
