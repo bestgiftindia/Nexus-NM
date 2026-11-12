@@ -7,10 +7,12 @@ use App\Http\Controllers\Account\Mobile\BasicController as BasicMobileController
 use App\Http\Controllers\Account\Pronology\PronologyController;
 use App\Http\Controllers\Account\ChildReport\ChildController;
 use App\Http\Controllers\Account\Relationship\RelationshipController;
+use Illuminate\Support\Facades\Auth;
 
 
 /// Loshugrid Management
 Route::controller(LoshugridController::class)->prefix('loshugrid')->name('loshugrid.')->group(function () {
+
     Route::get('/','index')->name('index')->middleware('permission:loshugrid-create');
     Route::post('/store','store')->name('store')->middleware('permission:loshugrid-create');
 
