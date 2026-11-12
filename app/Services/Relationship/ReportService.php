@@ -2,6 +2,7 @@
 
 namespace App\Services\Relationship;
 
+use App\Helpers\LoshuHelper;
 use App\Models\Relationship\HowManageYourRelationship;
 use App\Models\Relationship\Relationship as RelationshipModel;
 use App\Models\Relationship\RelationshipFinalConclusion;
@@ -20,6 +21,7 @@ use App\Models\Relationship\RelationshipTableOfContent;
 
 class ReportService extends FPDF
 {
+    public const IMAGEPATH = 'assets/img/report/relationship/';
     const DPI = 150;
     const A4_HEIGHT = 210;
     const A4_WIDTH = 297;
@@ -27,17 +29,20 @@ class ReportService extends FPDF
     const MAX_HEIGHT = 700;
     const MM_IN_INCH = 25.4;
 
-    protected $brandColor = ['HEX' => '#e7a90f', 'RGB' => '231, 169, 15'];
-    protected $textColor = ['HEX' => '#22357f', 'RGB' => '30, 42, 158'];
+    protected $brandColor = ['HEX' => '#3f153d', 'RGB' => '63, 21, 61'];
+    protected $secondaryColor = ['HEX' => '#905a76', 'RGB' => '144, 90, 118'];
+    protected $textColor = ['HEX' => '#ae7222', 'RGB' => '174, 114, 34'];
     protected $blackColor = ['HEX' => '#00000', 'RGB' => '0, 0, 0'];
 
     protected $fontFamily = "Times";
     protected $processingCoverPage = false;
 
     protected RelationshipService $relationshipService;
-    protected LoginService $loginUserService;
+    protected $loginUserService;
     protected int $generateReportId;
-    protected object $relationshipInfo, $loginUser;
+    protected object $relationshipInfo;
+
+    protected $loginUser;
     protected string $customerName;
     protected string $dateOfBirth;
     protected int $kingNumber, $queenNumber;
@@ -72,40 +77,12 @@ class ReportService extends FPDF
 
     private function resizeToFit($imgFilename)
     {
-        //     list($imgW, $imgH) = getimagesize($imgFilename);
-
-        //     $pageW = $this->GetPageWidth();
-        //     $pageH = $this->GetPageHeight();
-
-        //     // Desired margins
-        //     $marginX = 0;
-        //     $marginY = 0;
-
-        //     $availableW = $pageW - ($marginX * 2);
-        //     $availableH = $pageH - ($marginY * 2);
-
-        //     $imgRatio = $imgW / $imgH;
-
-        //     // Fit image inside available area
-        //     $newW = $availableW;
-        //     $newH = $newW / $imgRatio;
-
-        //     if ($newH > $availableH) {
-        //         $newH = $availableH;
-        //         $newW = $newH * $imgRatio;
-        //     }
-
-        //     // Center image
-        //     $x = ($pageW - $newW) / 2;
-        //     $y = ($pageH - $newH) / 2;
-
-        //    return  $this->Image($imgFilename, $x, $y, $newW, $newH);
         return $this->Image($imgFilename, 0, 0, $this->w, $this->h);
     }
 
     public function Header()
     {
-        $bgimage = public_path('assets/media/pdf-image/relationship/page.jpg');
+        $bgimage = public_path(self::IMAGEPATH . 'blank.png');
         if (file_exists($bgimage)) {
             $this->Image(
                 $bgimage,
@@ -114,18 +91,18 @@ class ReportService extends FPDF
                 $this->GetPageWidth(),
                 $this->GetPageHeight()
             );
-            $this->headerContent();
         }
         $this->SetXY(88, 30);
     }
 
     public function Footer()
     {
+        $customerName = strtoupper($this->customerName);
         if ($this->PageNo() > 1) {
-            $this->SetXY(55.5, 277.1);
+            $this->SetXY(0, 285);
             $this->SetFont($this->fontFamily, 'B', 9);
             $this->SetTextColor(106, 90, 122);
-            $this->Cell(0, 10, $this->PageNo(), 0, 0, 'C');
+            $this->Cell(0, 10, $customerName . " (PAGE NO " . $this->PageNo() . ")", 0, 0, 'C');
         }
         return false;
     }
@@ -137,8 +114,8 @@ class ReportService extends FPDF
         $this->processingCoverPage = true;
 
         $dob = $this->relationshipInfo->dob;
-        $this->kingNumber = getKingNumber($dob);
-        $this->queenNumber = getQueenNumber($dob);
+        $this->kingNumber = LoshuHelper::getKingNumber($dob ?? '')['king_no'] ?? '';
+        $this->queenNumber = LoshuHelper::getQueenNumber($dob ?? '')['king_no'] ?? '';
 
         $this->firstPageHere();
         $this->TableOfContentHere();
@@ -188,22 +165,29 @@ class ReportService extends FPDF
 
     function firstPageHere()
     {
-        $bgimage = public_path('assets/media/pdf-image/relationship/first-page.jpg');
+        $bgimage = public_path(self::IMAGEPATH . 'cover.png');
         $this->AddPage('P');
         // Background Image
         // $this->Image($bgimage, 0, 0, $this->w, $this->h);
         $this->resizeToFit($bgimage);
 
 
-        $this->SetXY(18, 175);
-        $this->SetFont($this->fontFamily, 'B', 24);
+        $this->SetXY(120, 214.2);
+        $this->SetFont($this->fontFamily, 'B', 20);
         $rgb = array_map('trim', explode(',', $this->textColor['RGB']));
         $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2],);
-        $this->Cell(0, 10, $this->customerName, 0, 1, 'C');
+        $this->Cell(0, 10, $this->customerName, 0, 1, 'L');
 
         $locationString = '';
         if (!empty($this->relationshipInfo->dob)) {
-            $locationString .= \Carbon\Carbon::parse($this->relationshipInfo->dob)->format('d M, Y');
+            $dob = \Carbon\Carbon::parse($this->relationshipInfo->dob)->format('d M, Y');
+
+            $this->SetXY(120, 226);
+            $this->SetFont($this->fontFamily, 'B', 16);
+            $rgb = array_map('trim', explode(',', $this->blackColor['RGB']));
+            $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2],);
+            $this->Cell(0, 10, $dob, 0, 1, 'L');
+
         }
         if (!empty($this->relationshipInfo->tob)) {
             $locationString .= ' | ' . \Carbon\Carbon::parse($this->relationshipInfo->tob)->format('h:i A');
@@ -212,29 +196,16 @@ class ReportService extends FPDF
             $locationString .= ' | ' . $this->relationshipInfo->location;
         }
 
-        $this->SetXY(18, 195);
-        $this->SetFont($this->fontFamily, 'B', 11);
-        $rgb = array_map('trim', explode(',', $this->blackColor['RGB']));
-        $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2],);
-        $this->Cell(0, 10, $locationString, 0, 1, 'C');
-    }
-
-    function headerContent()
-    {
-        $this->SetXY(88, 15.5);
-        $this->SetFont($this->fontFamily, 'B', 9);
-        $this->SetTextColor(149, 148, 148);
-        $this->Cell(100, 10, $this->customerName ?: 'TEST', 0, 1, 'R');
+        
     }
 
     function BlankPageHere(string $title, int $headerCount = 0)
     {
-        $imageName = 'blank-page';
-        $bgimage = public_path('assets/media/pdf-image/relationship/' . $imageName . '.jpg');
+        $imageName = 'blank';
+        $bgimage = public_path(self::IMAGEPATH . $imageName . '.png');
 
         $this->AddPage('P');
         $this->resizeToFit($bgimage);
-        $this->headerContent();
 
         // Header Heading Count Number
         $this->SetXY(25, 27.5);
@@ -247,23 +218,22 @@ class ReportService extends FPDF
             $this->Cell(0, 10, $headerCount, 0, 1, 'L');
             $this->SetXY(35, 27.5);
         } else {
-            $this->Cell(0, 10, "*", 0, 1, 'L');
+            $this->Cell(0, 10, "", 0, 1, 'L');
             $this->SetXY(31, 27.5);
         }
 
         /// Header Heading Content
 
         $this->SetFont($this->fontFamily, 'B', 16);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2]);
         $this->Cell(0, 10, $title, 0, 1, 'L');
     }
 
     function lastPageHere()
     {
-        $bgimage = public_path('assets/media/pdf-image/relationship/last-page.jpg');
+        $bgimage = public_path(self::IMAGEPATH . 'last.png');
         $this->AddPage('P');
         $this->resizeToFit($bgimage);
-        $this->headerContent();
     }
 
     public function insightBox(string $text)
@@ -506,14 +476,16 @@ class ReportService extends FPDF
     {
         $this->SetX(22);
 
-        $this->SetTextColor(212, 165, 0); // Gold
+
+        $rgb = array_map('trim', explode(',', $this->textColor['RGB']));
+
+        $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2]); // Gold
         $this->SetFont('ZapfDingbats', '', 12);
         $this->Cell(8, 6, chr(117), 0, 0);
 
         $this->SetX(27);
         $this->SetFont($this->fontFamily, 'B', 14);
-        $rgb = array_map('trim', explode(',', $this->textColor['RGB']));
-        $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2],);
+        $this->SetTextColor((int) $rgb[0], (int) $rgb[1], (int) $rgb[2]);
         $this->MultiCell(160, 8, $headingText, 0, 'L');
     }
 
@@ -627,9 +599,19 @@ class ReportService extends FPDF
 
         // Golden bullet
         if (($options['pinkDot'] ?? true) === true) {
-            $this->SetTextColor(191, 49, 101);
+            $rgb = array_map('trim', explode(',', $this->secondaryColor['RGB']));
+            $this->SetTextColor(
+                (int)$rgb[0],
+                (int)$rgb[1],
+                (int)$rgb[2]
+            );
         } else {
-            $this->SetTextColor(212, 175, 55);
+            $rgb = array_map('trim', explode(',', $this->textColor['RGB']));
+            $this->SetTextColor(
+                (int)$rgb[0],
+                (int)$rgb[1],
+                (int)$rgb[2]
+            );
         }
 
         $this->SetFont('Times', '', 18);
@@ -665,9 +647,7 @@ class ReportService extends FPDF
 
     function luckyUnluckyModel()
     {
-        return $queryData =  DB::table('lucky_unlucky_number_table')->where('king', $this->kingNumber)
-            ->where('queen', $this->queenNumber)
-            ->first();
+        return LoshuHelper::getLuckNumberData($this->relationshipInfo['dob']);
     }
 
     function tableOfContent($id)
@@ -745,7 +725,12 @@ class ReportService extends FPDF
                 $this->Ln(3);
                 $this->SetX(25);
                 $this->SetFont($this->fontFamily, 'B', 13);
-                $this->SetTextColor(191, 49, 101);
+                $rgb = array_map('trim', explode(',', $this->secondaryColor['RGB']));
+                $this->SetTextColor(
+                    (int)$rgb[0],
+                    (int)$rgb[1],
+                    (int)$rgb[2]
+                );
                 $text = trim($label);
                 $this->MultiCell(160, 6, $text . ' : ', 0, 'J');
 
@@ -960,15 +945,15 @@ class ReportService extends FPDF
         $sections = [
             [
                 'title' => 'Lucky Number',
-                'value' => !empty($luckyNumbers) ? str_replace(',', ", ", $luckyNumbers) : '-',
+                'value' => implode(", ", $luckyNumbers),
             ],
             [
                 'title' => 'Unlucky Number',
-                'value' => !empty($unluckyNumbers) ? str_replace(',', ", ", $unluckyNumbers) : '-',
+                'value' => implode(", ", $unluckyNumbers),
             ],
             [
                 'title' => 'Neutral Numbers',
-                'value' => !empty($neutralNumbers) ? str_replace(',', ", ", $neutralNumbers) : '-',
+                'value' => implode(", ", $neutralNumbers),
             ],
         ];
 
@@ -984,13 +969,13 @@ class ReportService extends FPDF
             $this->SetXY($currentX, $y + 3);
             $this->SetFont($this->fontFamily, 'B', 12);
             $this->SetTextColor(204, 51, 102);
-            $this->Cell($boxWidth, 6, $section['title'], 0, 1, 'C');
+            $this->Cell($boxWidth, 6, $section['title'] ?? '', 0, 1, 'C');
 
             // Value
             $this->SetXY($currentX, $y + 12);
             $this->SetFont($this->fontFamily, 'B', 14);
             $this->SetTextColor($black[0], $black[1], $black[2]);
-            $this->Cell($boxWidth, 8, $section['value'], 0, 1, 'C');
+            $this->Cell($boxWidth, 8, $section['value'] ?? '', 0, 1, 'C');
         }
 
         // Next content ke liye cursor neeche le jao
@@ -1044,10 +1029,13 @@ class ReportService extends FPDF
         sort($numbersInChart);
         sort($missingNumbers);
 
+        $mulankNumber =  LoshuHelper::getKingNumber($dob ?? '');
+        $bhagyankNumber =  LoshuHelper::getQueenNumber($dob ?? '');
+
         $table = [
             ['Energy', 'Detail'],
-            ['Mulank Number', $this->kingNumber . ' - ' . planets($this->kingNumber)],
-            ['Bhagyank Number', $this->queenNumber . ' - ' . planets($this->queenNumber)],
+            ['Mulank Number', $this->kingNumber . ' - ' . $mulankNumber['name'] ?? ''],
+            ['Bhagyank Number', $this->queenNumber . ' - ' . $bhagyankNumber['name']],
             ['Numbers in chart', implode(', ', $numbersInChart)],
             ['Missing Numbers', implode(', ', $missingNumbers)],
             // ['Supportive numbers present', $supportiveNumbersContent],
@@ -1086,8 +1074,8 @@ class ReportService extends FPDF
         );
 
         $this->kingQueenSection(
-            $queryData->balancer,
-            $queryData->unlucky_number,
+            $queryData->lucky_numbers,
+            $queryData->unlucky_numbers,
             $queryData->neutral_number
         );
 
@@ -1101,8 +1089,8 @@ class ReportService extends FPDF
         $this->Ln(5);
         $this->startSign('Supportive numbers present');
         foreach ($supportiveNumbers as $supportiveNumber) {
-            $planetData = getNumberDetails()[$supportiveNumber];
-            $this->bulletPoint($planetData['planet'] . ' (' . $supportiveNumber . ') - ' . $planetData['traits'], [
+            $planetData = LoshuHelper::getKingNumber($supportiveNumber ?? '');
+            $this->bulletPoint($planetData['name'] . ' (' . $supportiveNumber . ') - ' . $planetData['traits'], [
                 'setX' => 35,
                 'pinkDot' => true
             ]);
@@ -1214,7 +1202,7 @@ class ReportService extends FPDF
             $dob = $this->relationshipInfo->dob;
             $dobArr = explode('-', $dob);
             $year = date('Y', strtotime('+' . $A . 'years'));
-            $personalYear = getPersonalYear($dobArr[2], $dobArr[1], $year);
+            $personalYear = LoshuHelper::calculatePersonalYear($dob);
 
             $nextyears = RelationshipMarriagePatternNextSevenYear::where('personal_year', $personalYear)->first();
             $headingText = $year . ' - ' . $nextyears->title;
@@ -1401,19 +1389,19 @@ class ReportService extends FPDF
                 $calculateLoshuGrid = $calculateLoshuGrid['loshuGrid'];
                 $missingNumbers = $this->missingNumber();
 
-                $unlucky_number = !empty($queryData->unlucky_number) ? explode(",", $queryData->unlucky_number) : $this->defaultUnlucky;
+                $unlucky_number = $queryData->unlucky_number ?? $this->defaultUnlucky;
                 sort($unlucky_number);
                 $unlucky_number = implode(", ", $unlucky_number);
 
-                $lucky_number = explode(",", $queryData->balancer ?? []);
+                $lucky_number = $queryData->lucky_numbers;
                 sort($lucky_number);
                 $lucky_number = implode(", ", $lucky_number);
 
-                $neutral_number = explode(",", $queryData->neutral_number ?? []);
+                $neutral_number = $queryData->neutral_number;
                 sort($neutral_number);
                 $neutral_number = implode(", ", $neutral_number);
 
-                $lucky_neutral_number = explode(",", $queryData->balancer . ',' . $queryData->neutral_number ?? []);
+                $lucky_neutral_number = array_merge($queryData->lucky_numbers, $queryData->neutral_number);
                 sort($lucky_neutral_number);
                 $lucky_neutral_number = implode(", ", $lucky_neutral_number);
 
