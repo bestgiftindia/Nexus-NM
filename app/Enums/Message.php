@@ -24,4 +24,6 @@ enum Message: string
 
     case LOSHUGRIDSAVE = "Loshugrid has been created successfully.";
     case LOSHUGRIDUPDATE = "Loshugrid has been updated successfully.";
+    case NAMEREPORTSAVE = "Name report has been saved successfully.";
+    case NAMEREPORTUPDATE = "Name report has been updated successfully.";
 }

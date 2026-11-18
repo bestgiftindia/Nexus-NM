@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OtherController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\LandingPage\LpController;
+use App\Http\Controllers\LandingPage\PayuController;
 
 Route::middleware('guest')->group(function () {
     Route::controller(AuthController::class)->group(function () {
@@ -33,6 +35,32 @@ Route::controller(OtherController::class)->group(function () {
     Route::get('/states/lists', 'states_lists')->name('states');
     Route::get('/cities/lists', 'cities_lists')->name('cities');
 });
+
+
+Route::controller(LpController::class)->prefix('landing')->name('landing.')->group(function () {
+    Route::get('/name-report', 'nameReport')->name('name.report');
+});
+
+
+Route::post('/checkout', [
+    PayuController::class,
+    'checkout'
+])->name('checkout');
+
+Route::post('/payu/response', [
+    PayuController::class,
+    'response'
+])->name('payu.response');
+
+Route::post('/payu/callback', [
+    PayuController::class,
+    'callback'
+])->name('payu.callback');
+
+Route::get('/payment/result/{order}', [
+    PayuController::class,
+    'result'
+])->name('payment.result');
 
 
 Route::get('/image/{path}/sx{width}w/{folder}/{filename}', function ($path, $width, $folder, $filename) {

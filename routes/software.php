@@ -62,6 +62,19 @@ Route::controller(LoshugridController::class)->prefix('loshugrid')->name('loshug
 /// Pronology Management
 Route::controller(PronologyController::class)->prefix('pronology')->name('pronology.')->group(function () {
     Route::get('/','index')->name('index');
+    Route::post('/store','store')->name('store');
+
+    Route::get('/lists','lists')->name('lists');
+    Route::get('/lists/data','listdata')->name('lists.data');
+
+    Route::get('/{pronology}/info', 'info')->name('info');
+
+    Route::get('/{pronology}/edit', 'edit')->name('edit');
+    Route::patch('/{pronology}/update','update')->name('update');
+
+    Route::delete('/{pronology}', 'destroy')->name('destroy');
+
+    Route::get('/{pronology}/generate/pdf', 'generate')->name('generate.pdf');
 });
 
 /// Basic Mobile Management

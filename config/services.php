@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'payu' => [
+        'key' => env('PAYU_KEY'),
+        'salt' => env('PAYU_SALT'),
+        'mode' => env('PAYU_MODE', 'test'),
+    ],
+
 ];
