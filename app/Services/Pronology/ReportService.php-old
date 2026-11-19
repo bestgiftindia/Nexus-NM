@@ -1,0 +1,1224 @@
+<?php
+
+namespace App\Services\Pronology;
+
+use App\Models\FindLuckyUnluckyNumbersModel;
+use App\Models\LuckyUnluckyNumber;
+use Illuminate\Support\Facades\DB;
+use FPDF;
+
+class ReportService extends FPDF
+{
+    const DPI = 96;
+    const MM_IN_INCH = 25.4;
+    const A4_HEIGHT = 210;
+    const A4_WIDTH = 297;
+    const MAX_WIDTH = 500;
+    const MAX_HEIGHT = 700;
+
+    private $generateReportId;
+    private $custId;
+    private $name;
+    private $filename;
+    private $dob;
+    private $firstName;
+    private $mnum;
+
+    public function __construct($generateReportId)
+    {
+        parent::__construct();
+        $this->generateReportId = $generateReportId;
+    }
+
+    public function pixelsToMM($val)
+    {
+        return $val * self::MM_IN_INCH / self::DPI;
+    }
+
+    public function resizeToFit($imgFilename)
+    {
+        list($width, $height) = getimagesize($imgFilename);
+        $widthScale = self::MAX_WIDTH / $width;
+        $heightScale = self::MAX_HEIGHT / $height;
+        $scale = min($widthScale, $heightScale);
+        return [
+            round($this->pixelsToMM($scale * $width)),
+            round($this->pixelsToMM($scale * $height))
+        ];
+    }
+
+    public function centerImage($img)
+    {
+        list($width, $height) = $this->resizeToFit($img);
+        $this->Image(
+            $img,
+            (self::A4_HEIGHT - $width) / 2,
+            (self::A4_WIDTH - $height) / 2,
+            $width,
+            $height
+        );
+    }
+
+    public function Header()
+    {
+        $result = DB::table('namenumerology')
+            ->where('id', $this->generateReportId)
+            ->first();
+
+        if ($result) {
+            $this->name = $result->first_name . ' ' . $result->middle_name . ' ' . $result->last_name;
+            $this->filename = $result->first_name . $result->middle_name . $result->last_name;
+            $this->firstName = $result->first_name;
+            $this->dob = $result->date_of_birth;
+        }
+
+        $this->SetFont('Arial', 'I', 10);
+        $this->Cell(0, 2, $this->name, 0, 0, 'L');
+        $this->Cell(0, 2, $this->dob, 0, 1, 'R');
+        $hr = str_repeat('-', 190);
+        $this->Cell(189, 2, $hr, 0, 1);
+    }
+
+    public function Footer()
+    {
+        $this->SetY(-15);
+        $hr = str_repeat('-', 190);
+        $this->Cell(189, 2, $hr, 0, 1);
+        $this->SetFont('Arial', 'I', 8);
+    }
+
+    public function generatePDF()
+    {
+        $resultAdv = DB::table('namenumerology')
+            ->where('id', $this->generateReportId)
+            ->first();
+
+        $date = date('d', strtotime($resultAdv->date_of_birth));
+        $month = date('m', strtotime($resultAdv->date_of_birth));
+        $year = date('Y', strtotime($resultAdv->date_of_birth));
+
+        $d = str_replace('0', '', $date);
+        $m = $month;
+        $y = $year;
+        $strf = $resultAdv->first_name;
+        $strl = $resultAdv->last_name;
+        $name = $resultAdv->first_name . '' . $resultAdv->middle_name . '' . $resultAdv->last_name;
+        $str = $strf . $strl;
+        $mulsum = $d;
+        $bhysum = $d . '' . $m . '' . $y;
+        $king = 'King : ' . digSum1($mulsum);
+        $queen = 'Queen : ' . digSum1($bhysum);
+        $sum = $d . '' . $m . '' . $y;
+        $number = $sum;
+        $array = array_map('intval', str_split($number));
+        $nameArray = str_split($str);
+        $this->AliasNbPages();
+        $this->AddPage('P');
+        $this->SetFont('Times', '', 12);
+        $this->centerImage(public_path('assets/images/ganesh.png'));
+        $this->Cell(189, 10, '', 0, 1);
+        $this->AddPage('P');
+        $this->SetFont('Arial', 'B', 15);
+        $this->setFillColor(255, 255, 255);
+        // $this->Cell(35, 20, '', 0, 0, 'C');
+        $this->SetTextColor(0, 0, 0);
+        $this->Cell(189, 20, 'Table Of Content', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 1, 1, 0, 'C');
+        $this->Cell(110, 10, 'Lo-Shu Grid', 1, 1, 'C');
+        $this->setFillColor(32, 201, 151);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 2, 1, 0, 'C');
+        $this->Cell(110, 10, 'Name Numerology Prediction', 1, 1, 'C');
+        $this->setFillColor(255, 255, 255);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 3, 1, 0, 'C');
+        $this->Cell(110, 10, 'First Name Number', 1, 1, 'C');
+        $this->setFillColor(244, 246, 249);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 4, 1, 0, 'C');
+        $this->Cell(110, 10, 'Name Number', 1, 1, 'C');
+        $this->setFillColor(255, 255, 255);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 5, 1, 0, 'C');
+        $this->Cell(110, 10, 'Sound And Vibrations', 1, 1, 'C');
+        $this->setFillColor(244, 246, 249);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 6, 1, 0, 'C');
+        $this->Cell(110, 10, 'Prediction Based On First Letter', 1, 1, 'C');
+         $this->setFillColor(244, 246, 249);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 7, 1, 0, 'C');
+        $this->Cell(110, 10, '5 Year Analysis', 1, 1, 'C');
+         $this->setFillColor(244, 246, 249);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        $this->Cell(20, 10, 8, 1, 0, 'C');
+        $this->Cell(110, 10, 'Missing Number Remidies', 1, 1, 'C');
+        $this->setFillColor(255, 255, 255);
+        $this->Cell(20, 10, '', 0, 0, 'C');
+
+
+
+        $result = DB::table('namenumerology')
+            ->where('id', $this->generateReportId)
+            ->first();
+
+        if ($result && !empty($result->manual_name)) {
+
+            $manualData = json_decode($result->manual_name, true);
+
+            $hasManualContent = false;
+            // Keys matching your DB structure
+            $setsToCheck = ['Name Suggestion-1', 'Name Suggestion-2', 'Name Suggestion-3'];
+
+            foreach ($setsToCheck as $set) {
+                // Check if key exists and has data
+                if (isset($manualData[$set]) && (!empty($manualData[$set]['first_name']) || !empty($manualData[$set]['full_name']))) {
+                    $hasManualContent = true;
+                    break;
+                }
+            }
+
+            if ($hasManualContent) {
+                $this->AddPage('P');
+                $this->manualNamePage($manualData);
+            }
+        }
+
+
+        // Loshu Grid
+        $this->AddPage('P');
+        $sumNew = $d . '' . $m . '' . $y;
+        $numberNew = $sumNew;
+        $arrayNew = array_map('intval', str_split($numberNew));
+        $varOneNew = '';
+        $varTwoNew = '';
+        $varThreeNew = '';
+        $varFourNew = '';
+        $varFiveNew = '';
+        $varSixNew = '';
+        $varSevenNew = '';
+        $varEightNew = '';
+        $varNineNew = '';
+        $mplNew = 0;
+        $splNew = 0;
+        $pplNew = 0;
+        $spl1New = 0;
+        $spl2New = 0;
+        $thplNew = 0;
+        $wplNew = 0;
+        $aplNew = 0;
+        $fourNew = 0;
+        $twoNew = 0;
+        $nineNew = 0;
+        $threeNew = 0;
+        $fiveNew = 0;
+        $sevenNew = 0;
+        $eightNew = 0;
+        $oneNew = 0;
+        $sixNew = 0;
+        $four1New = 0;
+        $two1New = 0;
+        $nine1New = 0;
+        $three1New = 0;
+        $five1New = 0;
+        $seven1New = 0;
+        $eight1New = 0;
+        $one1New = 0;
+        $six1New = 0;
+        $mulsumNew = $d;
+        $bhysumNew = $d . '' . $m . '' . $y;
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(189, 15, 'LO-SHU GRID', 0, 1, 'C');
+        $this->SetTextColor(0, 0, 0);
+        $this->Cell(189, 5, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 8);
+        $this->Cell(50, 5, 'BHAGYANK', 0, 0, 'L');
+        $this->Cell(30, 5, digSum1($d . '' . $m . '' . $y), 0, 1, 'L');
+        $this->Cell(80, 10, '------------------------------------------------------------', 0, 1, 'L');
+        $this->Cell(50, 5, 'MOOLANK', 0, 0, 'L');
+        $this->Cell(30, 5, digSum1($d), 0, 1, 'L');
+        $this->Cell(100, 5, '', 0, 0, 'C');
+        $this->Cell(80, 10, '------------------------------------------------------------', 0, 1, 'L');
+        $this->Cell(100, 10, '', 0, 0, 'C');
+        $this->Cell(50, 10, 'KUA NUMBER (MALE)', 0, 0, 'L');
+        $this->Cell(30, 10, 11 - digSum1($y), 0, 1, 'L');
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 4) {
+                $fourNew = 33.33;
+                $four1New = 33.33;
+                $varFourNew .= $valueNew;
+                // $varFour1 = $value;
+            }
+        }
+        if ($d == 4) {
+            $varFourNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 4) {
+            $fourNew = 33.33;
+            $four1New = 33.33;
+            $varFourNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 4) {
+            $fourNew = 33.33;
+            $four1New = 33.33;
+            $varFourNew .= digSum1($bhysumNew);
+        }
+        // print_r($varFour);
+        $this->Cell(10, 10, $varFourNew, 1, 0, 'C');
+        // Nine
+        foreach ($arrayNew as $key => $valueNew) {
+            if ($valueNew == 9) {
+                $nineNew = 33.33;
+                $nine1New = 33.33;
+                $varNineNew .= $valueNew;
+                // $varNine1New = $valueNew;
+            }
+        }
+        if ($d == 9) {
+            $varNineNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 9) {
+            $nineNew = 33.33;
+            $nine1New = 33.33;
+            $varNineNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 9) {
+            $nineNew = 33.33;
+            $nine1New = 33.33;
+            $varNineNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varNineNew, 1, 0, 'C');
+        // Two
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 2) {
+                $twoNew = 33.33;
+                $two1New = 33.33;
+                $varTwoNew .= $valueNew;
+            }
+        }
+        if ($d == 2) {
+            $varTwoNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if ($d == 20) {
+            $varTwoNew .= substr($d, 0, 0) . substr($d, 2);
+        } else if (digSum1($mulsumNew) == 2) {
+            $twoNew = 33.33;
+            $two1New = 33.33;
+            $varTwoNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 2) {
+            $two = 33.33;
+            $two1 = 33.33;
+            $varTwoNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varTwoNew, 1, 0, 'C');
+        $this->Cell(50, 10, '', 0, 0, 'C');
+        $this->Cell(80, 10, '------------------------------------------------------------', 0, 1, 'L');
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 3) {
+                $threeNew = 33.33;
+                $three1New = 33.33;
+                $varThreeNew .= $valueNew;
+            }
+        }
+        if ($d == 3) {
+            $varThreeNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if ($d == 30) {
+            $varThreeNew .= substr($d, 0, 0) . substr($d, 2);
+        } else if (digSum1($mulsumNew) == 3) {
+            $threeNew = 33.33;
+            $three1New = 33.33;
+            $varThreeNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 3) {
+            $threeNew = 33.33;
+            $three1New = 33.33;
+            $varThreeNew .= digSum1($bhysumNew);
+        }
+        // print_r($three3);
+        $this->Cell(10, 10, $varThreeNew, 1, 0, 'C');
+        // Five
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 5) {
+                $fiveNew = 33.33;
+                $five1New = 33.33;
+                $varFiveNew .= $valueNew;
+            }
+        }
+        if ($d == 5) {
+            $varFiveNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 5) {
+            $fiveNew = 33.33;
+            $five1New = 33.33;
+            $varFiveNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 5) {
+            $fiveNew = 33.33;
+            $five1New = 33.33;
+            $varFiveNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varFiveNew, 1, 0, 'C');
+        // Seven
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 7) {
+                $sevanNew = 33.33;
+                $sevan1New = 33.33;
+                $varSevenNew .= $valueNew;
+            }
+        }
+        if ($d == 7) {
+            $varSevenNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 7) {
+            $sevanNew = 33.33;
+            $sevan1New = 33.33;
+            $varSevenNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 7) {
+            $sevanNew = 33.33;
+            $sevan1New = 33.33;
+            $varSevenNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varSevenNew, 1, 0, 'C');
+        $this->Cell(50, 10, '', 0, 0, 'C');
+        $this->Cell(50, 10, 'KUA NUMBER (FEMALE)', 0, 0, 'L');
+        $this->Cell(30, 10, digSum1(digSum1($y) + 4), 0, 1, 'L');
+        $this->Cell(20, 10, '', 0, 0, 'C');
+        // Eight
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 8) {
+                $eightNew = 33.33;
+                $eight1New = 33.33;
+                $varEightNew .= $valueNew;
+            }
+        }
+        if ($d == 8) {
+            $varEightNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 8) {
+            $eightNew = 33.33;
+            $eight1New = 33.33;
+            $varEightNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 8) {
+            $eightNew = 33.33;
+            $eight1New = 33.33;
+            $varEightNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varEightNew, 1, 0, 'C');
+        // One
+        // $iOne = 0;
+        foreach ($arrayNew as $valueNew) {
+            // echo $valueNew;
+            if ($valueNew == 1) {
+                // echo $valueNew."hi";
+                // $iOne++;
+                $oneNew = 33.33;
+                $one1New = 33.33;
+                $varOneNew .= $valueNew;
+                // $varOne1 = $value;
+            }
+        }
+        // echo 'Hello';
+        if ($d == 1) {
+            // echo 'Hi';
+            $varOneNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if ($d == 10) {
+            // echo 'Hi1';
+            $varOneNew .= substr($d, 0, 0) . substr($d, 2, 0);
+        } else if (digSum1($mulsumNew) == 1) {
+            // echo 'Hi2';
+            $oneNew = 33.33;
+            $one1New = 33.33;
+            $varOneNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 1) {
+            $oneNew = 33.33;
+            $one1New = 33.33;
+            $varOneNew .= digSum1($bhysumNew);
+        }
+        // print_r($varOneNew);
+        // exit();
+        $this->Cell(10, 10, $varOneNew, 1, 0, 'C');
+        // Six
+        foreach ($arrayNew as $valueNew) {
+            if ($valueNew == 6) {
+                $sixNew = 33.33;
+                $six1New = 33.33;
+                $varSixNew .= $valueNew;
+            }
+        }
+        if ($d == 6) {
+            $varSixNew .= substr($d, 0, 0) . substr($d, 1, 0);
+        } else if (digSum1($mulsumNew) == 6) {
+            $sixNew = 33.33;
+            $six1New = 33.33;
+            $varSixNew .= digSum1($mulsumNew);
+        }
+        if (digSum1($bhysumNew) == 6) {
+            $sixNew = 33.33;
+            $six1New = 33.33;
+            $varSixNew .= digSum1($bhysumNew);
+        }
+        $this->Cell(10, 10, $varSixNew, 1, 0, 'C');
+        $this->Cell(50, 10, '', 0, 0, 'C');
+        $this->Cell(80, 10, '------------------------------------------------------------', 0, 1, 'L');
+        $this->Cell(189, 30, '', 0, 1, 'C');
+
+        $this->AddPage('P');
+        $this->Cell(189, 1, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 16);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(189, 10, 'Name Numerology Prediction', 0, 1, 'C');
+        $this->Cell(189, 1, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetFillColor(255, 255, 255);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Age', 0, 0, 'C');
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('Arial', '', 15);
+        $dob = $d . '-' . $m . '-' . $y;
+        $today = date('Y-m-d');
+        $diff = date_diff(date_create($dob), date_create($today));
+        $age = $diff->format('%y');
+        $agg = $age + 1;
+        $ageData = 'Completed Age : ' . $age . ' ';
+        $ageData .= 'Age: ' . $agg;
+        $this->MultiCell(130, 10, $ageData, 0, 1, 'C');
+        // Missing Direction
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Missing Directions', 0, 0, 'C');
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('Arial', '', 15);
+        $dob = $d . '-' . $m . '-' . $y;
+        $direction = '';
+        $array1 = array(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        $dob1 = $d . '-' . $m . '-' . $y . '-' . digSum1($mulsum) . '-' . digSum1($bhysum);
+        $number = $dob1;
+        $array2 = array_map('intval', str_split($number));
+        $diff = array_diff($array1, $array2);
+        foreach ($diff as $diffs) {
+            if ($diffs == 1) {
+                $direction .= '- North -';
+            }
+            if ($diffs == 2) {
+                $direction .= '- South West -';
+            }
+            if ($diffs == 3) {
+                $direction .= '- East -';
+            }
+            if ($diffs == 4) {
+                $direction .= '- South East -';
+            }
+            if ($diffs == 5) {
+                $direction .= '- Center -';
+            }
+            if ($diffs == 6) {
+                $direction .= '- North West -';
+            }
+            if ($diffs == 7) {
+                $direction .= '- West -';
+            }
+            if ($diffs == 8) {
+                $direction .= '- North East -';
+            }
+            if ($diffs == 9) {
+                $direction .= '- South - ';
+            }
+        }
+        $this->MultiCell(189, 10, $direction, 0, 1, 'C');
+        // Missing Numbers
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Missing Numbers', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $dob = $d . '-' . $m . '-' . $y;
+        $differ = '';
+        $array1 = array(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        $dob1 = $d . '-' . $m . '-' . $y . '-' . digSum1($mulsum) . '-' . digSum1($bhysum);
+        $number = $dob1;
+        $array2 = array_map('intval', str_split($number));
+        $diff = array_diff($array1, $array2);
+        // 			print_r($diff);
+        // 			exit();
+        foreach ($diff as $diffs) {
+            $differ .= ' - ' . $diffs . ' - ';
+        }
+        // 			print_r($differ);
+        // 			exit();
+        $this->MultiCell(130, 10, $differ, 0, 1, 'C');
+        // Lucky Number
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Lucky Numbers', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $lucky = '';
+        $unlucky = '';
+        $neutral = '';
+        $lcolor = '';
+        $ulcolor = '';
+        DB::enableQueryLog();  // Enable query log
+        // echo $king = (int) $king;
+        // echo $queen = (int) $queen;
+        $luckyUnluckyNumbers = LuckyUnluckyNumber::where('king_planet_id', digSum1($d))
+            ->where('queen_planet_id', digSum1($d . '' . $m . '' . $y))
+            ->first();
+        // print_r($luckyUnluckyNumbers);
+        if ($luckyUnluckyNumbers) {
+            $lucky = $luckyUnluckyNumbers->balancer;
+            $unlucky = $luckyUnluckyNumbers->unlucky_number;
+            $neutral = implode(",",$luckyUnluckyNumbers->neutral_number);
+            $lcolor = strtoupper($luckyUnluckyNumbers->lucky_colour);
+            $ulcolor = strtoupper($luckyUnluckyNumbers->unlucky_colour);
+        }
+        // echo $lucky;
+        // echo $unlucky;
+        // exit();
+        $this->MultiCell(130, 10, $lucky, 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Un Lucky Numbers', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $this->MultiCell(130, 10, $unlucky, 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Neutral Numbers', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $this->MultiCell(130, 10, $neutral, 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Lucky Color', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $this->MultiCell(130, 10, $lcolor, 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 15);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(50, 10, 'Un Lucky Colors', 0, 0, 'C');
+        $this->SetFont('Arial', '', 15);
+        $this->SetTextColor(0, 0, 0);
+        $this->MultiCell(130, 10, $ulcolor, 0, 1, 'C');
+
+        $this->AddPage('P');
+        $this->Cell(189, 1, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 16);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(189, 10, 'First Name Number', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('Arial', '', 15);
+
+        $ar = [
+            'A' => 1, 'B' => 2, 'C' => 3, 'D' => 4, 'E' => 5,
+            'F' => 8, 'G' => 3, 'H' => 5, 'I' => 1, 'J' => 1,
+            'K' => 2, 'L' => 3, 'M' => 4, 'N' => 5, 'O' => 7,
+            'P' => 8, 'Q' => 1, 'R' => 2, 'S' => 3, 'T' => 4,
+            'U' => 6, 'V' => 6, 'W' => 6, 'X' => 5, 'Y' => 1,
+            'Z' => 7, '1' => 1, '2' => 2, '3' => 3, '4' => 4,
+            '5' => 5, '6' => 6, '7' => 7, '8' => 8, '9' => 9
+        ];
+
+ 
+        $numero = 0;
+        $str = preg_replace('/[^A-Z0-9]/', '', strtoupper($strf));
+        
+        foreach (str_split($str) as $char) {
+            $numero += $ar[$char];
+        }
+      
+        $firstNameNumber = 'First Name: ' . $strf . "\n";
+        $firstNameNumber .= 'First Name Total : ' . digSum1(chaldean_sum($strf)) . "\n";
+        $firstNameNumber .= 'Compound : ' . $numero . "\n";
+        $firstNameNumber .= "First Name is Compatible with Date of Birth or not? \n";
+
+        if ($luckyUnluckyNumbers) {
+            $balancerNumbers = $luckyUnluckyNumbers->lucky_numbers;
+            $neutralNumbers = $luckyUnluckyNumbers->neutral_number;
+            $unluckyNumbers = $luckyUnluckyNumbers->unlucky_number;
+
+            if (in_array(digSum1(chaldean_sum($strf)), $balancerNumbers)) {
+                $firstNameNumber .= 'Great! Your first Name is compatible/Lucky with your date of birth. ' . "\n";
+            } elseif (in_array(digSum1(chaldean_sum($strf)), $neutralNumbers)) {
+                $firstNameNumber .= 'First name is Neutral to your date of birth, that means it is not lucky but it is still workable. ' . "\n";
+            } elseif (in_array(digSum1(chaldean_sum($strf)), $unluckyNumbers)) {
+                $firstNameNumber .= 'First name is Anti(Not Suitable) to your date of birth, You need to change it or consult with a Good Numerologist for Name Analysis. Highly Recommended!!! ' . "\n";
+            }
+        }
+
+        $compoundDescription = DB::table('pronologycompoundtable')
+            ->where('compoundNumber', $numero)
+            ->value('compoundDesc');
+
+        if ($compoundDescription) {
+            $firstNameNumber .= 'Compound Number : ' . $compoundDescription;
+        }
+// dd($firstNameNumber);
+        $this->MultiCell(189, 10, $firstNameNumber, 0, 1, 'C');
+
+        // Full Name
+        $this->AddPage('P');
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        $this->SetFont('Arial', 'B', 16);
+        $this->SetTextColor(166, 42, 42);
+
+        $this->Cell(189, 10, 'Name Numbers', 0, 1, 'C');
+
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(0, 0, 0);
+
+        $this->SetFont('Arial', '', 15);
+
+        $nameNumber = '';
+        error_reporting(0);
+
+        $str = strtoupper($name);
+        $len = strlen($str);
+        $numero1 = 0;
+
+        for ($i = 0; $i < $len; $i++) {
+            $alpha1 = $str[$i];
+            $numero1 += $ar[$alpha1] ?? 0;
+        }
+
+        $nmc1 = $numero1;
+        $nameNumber = 'Full Name: ' . $this->name . "\n";
+        $nameNumber .= 'Name Number : ' . digSum1(chaldean_sum($name)) . "\n";
+        $nameNumber .= 'Compound : ' . $numero1 . "\n";
+        $nameNumber .= "Name Number is Compatible With Date of Birth Or Not? \n";
+
+        if ($luckyUnluckyNumbers) {
+            $balancers = $luckyUnluckyNumbers->lucky_numbers;
+            $neutrals = $luckyUnluckyNumbers->neutral_number;
+            $unluckys = $luckyUnluckyNumbers->unlucky_number;
+
+            if (in_array(digSum1(chaldean_sum($name)), $balancers)) {
+                $nameNumber .= 'Great! Your Full Name is compatible/Lucky with your date of birth.' . "\n";
+            } elseif (in_array(digSum1(chaldean_sum($name)), $neutrals)) {
+                $nameNumber .= 'Full name is Neutral to your date of birth, that means it is not lucky but it is still workable.' . "\n";
+            } elseif (in_array(digSum1(chaldean_sum($name)), $unluckys)) {
+                $nameNumber .= 'Full name is Anti(Not Suitable) to your date of birth. You need to change it or consult with a Numerologist for Name Analysis. Highly Recommended!!!' . "\n";
+            }
+        }
+
+        $compoundDesc = DB::table('pronologycompoundtable')
+            ->where('compoundNumber', $numero1)
+            ->value('compoundDesc');
+
+        if ($compoundDesc) {
+            $nameNumber .= 'Compound Number : ' . $compoundDesc;
+        }
+
+        $this->MultiCell(189, 10, $nameNumber, 0, 1, 'C');
+
+        $this->AddPage('P');
+
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        $this->SetFont('Arial', 'B', 16);
+        $this->SetTextColor(166, 42, 42);
+
+        // Add the 'Sound And Vibrations' title
+        $this->Cell(189, 10, 'Sound And Vibrations', 0, 1, 'C');
+
+        // Add another empty cell as a spacer
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        // Set the font and text color for the content
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(0, 0, 0);
+
+        // Reset font for the body text
+        $this->SetFont('Arial', '', 15);
+
+        $soundAndVibration = '';
+
+        $str = strtoupper($name);  // Assuming $filename is the input string
+
+        // Query the database for sound and vibration information
+        $soundAndVibrationResults = DB::table('namenumerologymaster')
+            ->select('nameString', 'vibration')
+            ->whereRaw("'$str' LIKE CONCAT('%', nameString, '%')")
+            ->get();
+
+        if ($soundAndVibrationResults->isNotEmpty()) {
+            // Output the vibration of each substring found
+            foreach ($soundAndVibrationResults as $row) {
+                $soundAndVibration .= 'Sound: ' . $row->nameString . ', Vibration: ' . $row->vibration . "\n";
+            }
+        } else {
+            $soundAndVibration = 'There is no sound vibration as per pronology in your name.';
+        }
+
+        // Output the sound and vibration information to the this
+        $this->MultiCell(189, 10, $soundAndVibration, 0, 1, 'C');
+
+        // Add another page for Prediction
+        $this->AddPage('P');
+
+        // Add an empty cell as a spacer
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        // Set the font and text color for the title
+        $this->SetFont('Arial', 'B', 16);
+        $this->SetTextColor(166, 42, 42);
+
+        // Add the 'Prediction Based On Your Name First Letter' title
+        $this->Cell(189, 10, 'Prediction Based On Your Name First Letter', 0, 1, 'C');
+
+        // Add another empty cell as a spacer
+        $this->Cell(189, 1, '', 0, 1, 'C');
+
+        // Set the font and text color for the content
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(0, 0, 0);
+
+        // Reset font for the body text
+        $this->SetFont('Arial', '', 15);
+
+        $pred = '';
+        $firstLetter = strtoupper(substr($str, 0, 1));  // Get the first letter of the string
+
+        // Query the database for prediction based on the first letter
+        $firstLetterResult = DB::table('namenumerologyalphamaster')
+            ->where('alphabet', $firstLetter)
+            ->first();
+
+        if ($firstLetterResult) {
+            $pred = $firstLetterResult->description . ' ';
+        } else {
+            $pred = "No prediction found for the first letter '$firstLetter'. ";
+        }
+
+        // Output the prediction information to the this
+        $this->MultiCell(189, 10, str_replace(array('``', '`', ';', '’', '“', '”'), "'", $pred), 0, 1, 'C');
+
+        $this->AddPage('P');
+        $this->personalYearPage($this->dob);
+
+         $this->AddPage('P');
+         $this->missingNumberRemedies($varOneNew, $varTwoNew, $varThreeNew, $varFourNew, $varFiveNew, $varSixNew, $varSevenNew, $varEightNew, $varNineNew);
+        $dieznWarning = $this->checkDiezn($name);
+         if ($dieznWarning) {
+            $this->AddPage('P');
+            $this->SetFont('Arial', 'B', 16);
+            $this->SetTextColor(255, 0, 0); // Red color for warning
+            $this->Cell(189, 10, 'Disclaimer', 0, 1, 'C');
+            $this->SetFont('Arial', '', 12);
+            $this->SetTextColor(0, 0, 0); // Reset to black
+            $this->MultiCell(189, 10, $dieznWarning, 0, 'C');
+        }
+
+
+    
+
+
+
+        // $this->Output(public_path('pdf_downloaded/' . $name . '.pdf'), 'F');
+        $this->Output('D', 'Pronology_Report_' . $name . '.pdf');
+        exit;
+    }
+
+    private function personalYearPage($dob)
+    {
+        // $pdf->Cell(0, 50, 'Numerology Report For', 0, 0, 'C');
+        $this->SetFont('Arial', 'B', 16);
+        // Personal Year Number Page Start
+        $this->Cell(189, 10, '5 Year Analysis', 0, 1, 'C');
+        $this->SetFont('Arial', '', 10);
+        $d = date('d', strtotime($dob));
+        $m = date('m', strtotime($dob));
+        $y = date('Y', strtotime($dob));
+        $currentYear = date('Y');
+        $this->Cell(189, 5, htmlspecialchars('The personal year number gives you clue as to what lies ahead in the coming year. Your Maturity and development take'), 0, 1);
+        $this->Cell(189, 5, htmlspecialchars('place in nine-year stages. Each nine year period marks the beginning and the end of a particular stage of development.'), 0, 1);
+        $this->Cell(189, 5, htmlspecialchars('In nutshell, this number tells you how the particular year will be for you.'), 0, 1);
+        for ($i = $currentYear; $i <= ($currentYear + 4); $i++) {
+            $this->SetFont('Arial', 'B', '12');
+            $newDob = digSum1($d . '' . $m . '' . $i);
+            $this->Cell(189, 7, 'Year - ' . $i . ', Your Personal Number is - ' . $newDob, 0, 1);
+            $resPYT = DB::table('personal_year_table')->where('personal_year_number', $newDob)->first();
+
+                $this->SetFont('Arial', '', 10);
+                foreach (explode("()", $resPYT->msg1) as $val) {
+                    $this->Cell(189, 7, str_replace(array("``", "`", ";", "’"), "'", $val), 0, 1);
+                }
+
+        }
+    }
+
+
+private function manualNamePage($manualData)
+{
+    // --- Header ---
+    $this->SetFont('Arial', 'B', 16);
+    $this->SetTextColor(23, 198, 83); // Green color
+    $this->Cell(0, 10, 'Name Suggestion As Per Numerology', 0, 1, 'C');
+
+    // Line separator
+    $this->SetDrawColor(50, 50, 50);
+    $this->SetLineWidth(0.5);
+    $this->Line(10, $this->GetY(), 200, $this->GetY());
+    $this->Ln(10);
+
+    // --- Content ---
+    $this->SetTextColor(0, 0, 0);
+    $this->SetLineWidth(0.2);
+
+    // Map DB keys to Display Labels
+    $sets = [
+        'Name Suggestion-1' => ' Name Fixed Suggestion 1',
+        'Name Suggestion-2' => ' Name Fixed Suggestion 2',
+        'Name Suggestion-3' => ' Name Fixed Suggestion 3'
+    ];
+
+    $hasPrintedAny = false;
+
+    foreach ($sets as $key => $label) {
+        $firstName = $manualData[$key]['first_name'] ?? '';
+        $fullName  = $manualData[$key]['full_name'] ?? '';
+        
+        // Get the totals from DB
+        $fScore = $manualData[$key]['first_name_score'] ?? '';
+        $flScore = $manualData[$key]['full_name_score'] ?? '';
+
+        if (!empty($firstName) || !empty($fullName)) {
+            
+            $hasPrintedAny = true;
+
+            // --- Suggestion Heading (Gray Background) ---
+            $this->SetFont('Arial', 'B', 12);
+            $this->SetFillColor(230, 230, 230);
+            $this->Cell(190, 10, '  ' . $label, 1, 1, 'L', true);
+
+            // --- First Name Block ---
+            if(!empty($firstName)) {
+                // Name Row
+                $this->SetFont('Arial', 'B', 11);
+                $this->Cell(50, 10, '  First Name', 1, 0, 'L');
+                $this->SetFont('Arial', '', 11);
+                $this->Cell(140, 10, '  ' . $firstName, 1, 1, 'L');
+
+                // Total Row (Only if score exists)
+                if(!empty($fScore)) {
+                    $this->SetFont('Arial', 'B', 11);
+                    $this->Cell(50, 10, '  Name Total', 1, 0, 'L');
+                    $this->SetFont('Arial', '', 11);
+                    $this->Cell(140, 10, '  ' . $fScore, 1, 1, 'L');
+                }
+            }
+
+            // --- Full Name Block ---
+            if(!empty($fullName)) {
+                // Name Row
+                $this->SetFont('Arial', 'B', 11);
+                $this->Cell(50, 10, '  Full Name', 1, 0, 'L');
+                $this->SetFont('Arial', '', 11);
+                $this->Cell(140, 10, '  ' . $fullName, 1, 1, 'L');
+
+                // Total Row (Only if score exists)
+                if(!empty($flScore)) {
+                    $this->SetFont('Arial', 'B', 11);
+                    $this->Cell(50, 10, '  Name Total', 1, 0, 'L');
+                    $this->SetFont('Arial', '', 11);
+                    $this->Cell(140, 10, '  ' . $flScore, 1, 1, 'L');
+                }
+            }
+
+            $this->Ln(8); // Gap between sets
+        }
+    }
+
+    // --- Footer Note ---
+    if ($hasPrintedAny) {
+        $this->Ln(5);
+        $this->SetFont('Arial', 'I', 10); // Italic, slightly smaller
+        $this->SetTextColor(80, 80, 80); // Dark Gray
+        
+        // Using MultiCell to ensure text wraps if it gets too long
+        $this->MultiCell(190, 6, 'Note: As per your DOB, above is suggested name aligned.', 0, 'L');
+    }
+}
+
+ private function checkDiezn($fullName)
+    {
+        // 1. Convert name to lowercase so we match 'D' and 'd' equally
+        $cleanName = strtolower($fullName);
+
+        // 2. Define the specific target characters (DIEZN)
+        $targetChars = ['d', 'i', 'e', 'z','h', 'n'];
+
+        // 3. Loop through only these specific characters
+        foreach ($targetChars as $char) {
+
+            // Count how many times this specific char appears in the name
+            $count = substr_count($cleanName, $char);
+
+            // 4. If any of them appears 3 or more times, trigger the warning
+            if ($count >= 3) {
+                return "Since the character '$char' comes 3 times or more in your name, you could face health issues in life. Please contact a numerologist to fix your name.";
+            }
+        }
+
+        return null; // Logic passed, no warning needed
+    }
+
+
+
+
+
+
+   private function missingNumberRemedies($varOne, $varTwo, $varThree, $varFour, $varFive, $varSix, $varSeven, $varEight, $varNine)
+    {
+        $this->Cell(189, 3, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 12);
+        $this->SetTextColor(166, 42, 42);
+        $this->Cell(189, 8, 'MISSING NUMBER REMEDIES', 0, 1, 'C');
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('Arial', '', 10);
+        //First Row
+        $this->Cell(80, 10, '', 0, 0, 'C');
+        $this->SetFillColor(166, 42, 42);
+        $this->SetTextColor(0, 0, 0);
+        if($varFour != '') {
+            $fourTrue = 0;
+            $this->Cell(10, 10,$varFour, 1, 0, 'C', $fourTrue);
+        }else {
+            $fourTrue = 1;
+            $this->Cell(10, 10,4, 1, 0, 'C', $fourTrue);
+        }
+        if($varNine != '') {
+            $nineTrue = 0;
+            $this->Cell(10, 10, $varNine, 1, 0, 'C', $nineTrue);
+        }else {
+            $nineTrue = 1;
+            $this->Cell(10, 10, 9, 1, 0, 'C', $nineTrue);
+        }
+        if($varTwo != '') {
+            $twoTrue = 0;
+            $this->Cell(10, 10, $varTwo, 1, 0, 'C', $twoTrue);
+        }else {
+            $twoTrue = 1;
+            $this->Cell(10, 10, 2, 1, 0, 'C', $twoTrue);
+        }
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFillColor(255, 255, 255);
+        $this->Cell(80, 10, '', 0, 1, 'C');
+        //Second Row
+        $this->Cell(80, 10, '', 0, 0, 'C');
+        $this->SetFillColor(166, 42, 42);
+        $this->SetTextColor(0 ,0 ,0);
+        if($varThree != '') {
+            $fourTrue = 0;
+            $this->Cell(10, 10,$varThree, 1, 0, 'C', $fourTrue);
+        }else {
+            $fourTrue = 1;
+            $this->Cell(10, 10,3, 1, 0, 'C', $fourTrue);
+        }
+        if($varFive != '') {
+            $nineTrue = 0;
+            $this->Cell(10, 10, $varFive, 1, 0, 'C', $nineTrue);
+        }else {
+            $nineTrue = 1;
+            $this->Cell(10, 10, 5, 1, 0, 'C', $nineTrue);
+        }
+        if($varSeven != '') {
+            $twoTrue = 0;
+            $this->Cell(10, 10, $varSeven, 1, 0, 'C', $twoTrue);
+        }else {
+            $twoTrue = 1;
+            $this->Cell(10, 10, 7, 1, 0, 'C', $twoTrue);
+        }
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFillColor(255, 255, 255);
+        $this->Cell(80, 10, '', 0, 1, 'C');
+        //Third Row
+        $this->Cell(80, 10, '', 0, 0, 'C');
+        $this->SetFillColor(166, 42, 42);
+        $this->SetTextColor(0, 0, 0);
+        if($varEight != '') {
+            $fourTrue = 0;
+            $this->Cell(10, 10,$varEight, 1, 0, 'C', $fourTrue);
+        }else {
+            $fourTrue = 1;
+            $this->Cell(10, 10,8 , 1, 0, 'C', $fourTrue);
+        }
+        if($varOne != '') {
+            $nineTrue = 0;
+            $this->Cell(10, 10, $varOne, 1, 0, 'C', $nineTrue);
+        }else {
+            $nineTrue = 1;
+            $this->Cell(10, 10, 1, 1, 0, 'C', $nineTrue);
+        }
+        if($varSix != '') {
+            $twoTrue = 0;
+            $this->Cell(10, 10, $varSix, 1, 0, 'C', $twoTrue);
+        }else {
+            $twoTrue = 1;
+            $this->Cell(10, 10, 6, 1, 0, 'C', $twoTrue);
+        }
+        $this->SetTextColor(0, 0, 0);
+        $this->SetFillColor(255, 255, 255);
+        $this->Cell(80, 10, '', 0, 1, 'C');
+        $this->Cell(189, 10, '', 0, 1, 'C');
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(189, 8, 'As per your date of birth, your missing numbers are highlighted!', 0, 1, 'L');
+        $this->SetFont('Arial', '', 12);
+        $this->Cell(189, 8, 'Missing numbers which didnt come in the Lo Shu chart', 0, 1, 'L');
+        if($varFour != '') {
+            $fourTrue = 0;
+            // $this->Cell(10, 10,$varEight, 1, 0, 'C', $fourTrue);
+        }else {
+
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '4')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 4', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+            // $fourTrue = 1;
+            // $this->Cell(10, 10, '', 0, 0);
+            // $this->Cell(10, 10, $message , 1, 0, 'C');
+        }
+        if($varNine != '') {
+            $nineTrue = 0;
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '9')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 9', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varTwo != '') {
+            $twoTrue = 0;
+            // $this->Cell(10, 10, $varSix.''.$varSix1.''.$varSix2.''.$varSix3, 1, 0, 'C', $twoTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '2')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 2', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varThree != '') {
+            $fourTrue = 0;
+            // $this->Cell(10, 10,$varEight.''.$varEight1.''.$varEight2.''.$varEight3, 1, 0, 'C', $fourTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '3')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 3', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varFive != '') {
+            $nineTrue = 0;
+            // $this->Cell(10, 10, $varOne.''.$varOne1.''.$varOne2.''.$varOne3, 1, 0, 'C', $nineTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '5')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 5', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varSeven != '') {
+            $twoTrue = 0;
+            // $this->Cell(10, 10, $varSix.''.$varSix1.''.$varSix2.''.$varSix3, 1, 0, 'C', $twoTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '7')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 7', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varEight != '') {
+            $fourTrue = 0;
+            // $this->Cell(10, 10,$varEight.''.$varEight1.''.$varEight2.''.$varEight3, 1, 0, 'C', $fourTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '8')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 8', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varOne != '') {
+            $nineTrue = 0;
+            // $this->Cell(10, 10, $varOne.''.$varOne1.''.$varOne2.''.$varOne3, 1, 0, 'C', $nineTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '1')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 1', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+        if($varSix != '') {
+            $twoTrue = 0;
+            // $this->Cell(10, 10, $varSix.''.$varSix1.''.$varSix2.''.$varSix3, 1, 0, 'C', $twoTrue);
+        }else {
+            $resMNT = DB::table('missing_number_remedies_table')->where('missingNumber', '6')->first();
+
+            $this->SetFont('Times', 'B', 12);
+            $this->MultiCell(189, 5, 'Missing Number 6', 0, 1);
+            if($resMNT){
+                    $message = $resMNT->remedies;
+                foreach (explode("()", $message) as $val) {
+                    $this->SetFont('Arial', '', 10);
+                    $this->MultiCell(189, 5, $val, 0, 1);
+                }
+            }
+        }
+    }
+
+}
