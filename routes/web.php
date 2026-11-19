@@ -47,20 +47,14 @@ Route::post('/checkout', [
     'checkout'
 ])->name('checkout');
 
-Route::post('/payu/response', [
-    PayuController::class,
-    'response'
-])->name('payu.response');
 
 Route::post('/payu/callback', [
     PayuController::class,
     'callback'
 ])->name('payu.callback');
 
-Route::get('/payment/result/{order}', [
-    PayuController::class,
-    'result'
-])->name('payment.result');
+Route::get('/payu/thank-you/{txnid}', [PayuController::class, 'thankyou'])->name('payu.thankyou');
+Route::get('/payu/payment-failed', [PayuController::class, 'failed'])->name('payu.failed');
 
 
 Route::get('/image/{path}/sx{width}w/{folder}/{filename}', function ($path, $width, $folder, $filename) {

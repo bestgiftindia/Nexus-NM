@@ -28,6 +28,7 @@ class PayuController extends Controller
             ],
             'dob' => 'required|date|before_or_equal:today',
             'gender' => 'required|in:Male,Female,Other',
+            'amount' => 'required'
         ]);
 
         $order = DB::transaction(function () use ($validated) {
@@ -40,7 +41,7 @@ class PayuController extends Controller
                 'gender' => $validated['gender'],
 
                 // Never accept amount from frontend.
-                'amount' => config('services.payu.price'),
+                'amount' => $validated['amount'],
 
                 'status' => 'pending',
             ]);
@@ -59,7 +60,7 @@ class PayuController extends Controller
         $firstname = Str::before($order->name, ' ');
         $lastname = trim(Str::after($order->name, ' '));
 
-        $productinfo = 'Numerology Report';
+        $productinfo = 'OS0000NR';
 
         $params = [
             'key' => $key,
@@ -76,17 +77,17 @@ class PayuController extends Controller
 
         // Five empty UDF fields are retained.
         $hashString = implode('|', array_merge(
-            [
-                $params['key'],
-                $params['txnid'],
-                $params['amount'],
-                $params['productinfo'],
-                $params['firstname'],
-                $params['email'],
-            ],
-            ['', '', '', '', ''],
-            [$salt]
-        ));
+    [
+        $params['key'],
+        $params['txnid'],
+        $params['amount'],
+        $params['productinfo'],
+        $params['firstname'],
+        $params['email'],
+    ],
+    array_fill(0, 10, ''),
+    [$salt]
+));
 
         $params['hash'] = strtolower(
             hash('sha512', $hashString)
@@ -106,98 +107,107 @@ class PayuController extends Controller
     }
 
 
-    //// RESPONSE
-
-    public function response(Request $request)
+        public function callback(Request $request)
     {
-        $data = $request->all();
-
-        // Some SDK responses contain a nested response object.
-        if (isset($data['response']) && is_array($data['response'])) {
-            $data = $data['response'];
-        }
-
-        $result = $this->processPaymentResponse($data);
-
-        return response()->json($result);
-    }
-
-    public function callback(Request $request)
-    {
-        // PayU may POST form data to surl/furl.
-        $result = $this->processPaymentResponse(
-            $request->all()
-        );
-
-        return redirect()->route(
-            'payment.result',
-            $result['order_id'] ?? 0
-        );
-    }
-
-    private function processPaymentResponse(array $data): array
-    {
+        $data  = $request->except('_token');
         $txnid = $data['txnid'] ?? null;
 
-        if (!$txnid) {
-            return [
-                'success' => false,
-                'message' => 'Transaction ID missing.',
-            ];
+        // 1. Hash check: bina sahi hash ke response ko trust nahi karna
+        if (! $txnid || ! $this->verifyResponseHash($data)) {
+            Log::warning('PayU callback: hash mismatch / txnid missing', $data);
+
+            return redirect()->route('payu.failed', ['txnid' => $txnid]);
         }
 
+        $payuStatus = strtolower($data['status'] ?? '');
+
+        // 2. Order update (lock taaki double POST se do baar process na ho)
+        $order = DB::transaction(function () use ($txnid, $data, $payuStatus) {
+            $order = PaymentOrder::where('txnid', $txnid)->lockForUpdate()->first();
+
+            if (! $order) {
+                return null;
+            }
+
+            // Pehle se success hai to dobara overwrite mat karo
+            if ($order->status === 'success') {
+                return $order;
+            }
+
+            $amountOk = round((float) ($data['amount'] ?? 0), 2) === round((float) $order->amount, 2);
+
+            if ($payuStatus === 'success' && $amountOk) {
+                $status = 'success';
+            } elseif ($payuStatus === 'pending') {
+                $status = 'pending';
+            } else {
+                $status = 'failed';
+            }
+
+            $order->update([
+                'status'        => $status,
+                'mihpayid'      => $data['mihpayid'] ?? null,
+                'payu_status'   => $data['status'] ?? null,
+                'payment_mode'  => $data['mode'] ?? null,
+                'bank_ref_num'  => $data['bank_ref_num'] ?? null,
+                'error_message' => $amountOk
+                    ? Str::limit($data['error_Message'] ?? '', 250, '')
+                    : 'Amount mismatch',
+                'payu_response' => $data,
+                'paid_at'       => $status === 'success' ? now() : null,
+            ]);
+
+            return $order;
+        });
+
+        if (! $order) {
+            Log::warning('PayU callback: order not found', ['txnid' => $txnid]);
+
+            return redirect()->route('payu.failed', ['txnid' => $txnid]);
+        }
+
+        // 3. Redirect
+        if ($order->status === 'success') {
+            return redirect()->route('payu.thankyou', $order->txnid);
+        }
+
+        return redirect()->route('payu.failed', ['txnid' => $order->txnid]);
+    }
+
+    public function thankyou(string $txnid)
+    {
         $order = PaymentOrder::where('txnid', $txnid)
-            ->first();
+            ->where('status', 'success')
+            ->firstOrFail();
 
-        if (!$order) {
-            return [
-                'success' => false,
-                'message' => 'Order not found.',
-            ];
+        // Apne thank-you blade ka naam yahan daalein
+        return view('landing-page.name-report.thankyou', [
+            'orderinfo' => $order
+        ]);
+    }
+
+    public function failed(Request $request)
+    {
+        return view('landing-page.payment-failed', [
+            'txnid' => $request->query('txnid'),
+        ]);
+    }
+
+    /**
+     * PayU reverse hash:
+     * sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
+     * additionalCharges aaye to: sha512(additionalCharges|SALT|status|...)
+     */
+    private function verifyResponseHash(array $data): bool
+    {
+        if (empty($data['hash'])) {
+            return false;
         }
 
-        // Idempotency: never process an already-paid order again.
-        if ($order->status === 'paid') {
-            return [
-                'success' => true,
-                'order_id' => $order->id,
-                'message' => 'Payment already verified.',
-            ];
-        }
-
-        $key = config('services.payu.key');
-        $salt = config('services.payu.salt');
-
-        $expectedAmount = number_format(
-            (float) $order->amount,
-            2,
-            '.',
-            ''
-        );
-
-        // Verify important response parameters.
-        if (
-            ($data['key'] ?? '') !== $key ||
-            ($data['amount'] ?? '') !== $expectedAmount
-        ) {
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Payment details mismatch.',
-            ];
-        }
-
-        // Generate reverse hash.
-        $status = strtolower($data['status'] ?? '');
-
-        $reverseParts = [
-            $salt,
-            $status,
-            '',
-            '',
-            '',
-            '',
-            '',
+        $parts = [
+            config('services.payu.salt'),
+            $data['status'] ?? '',
+            '', '', '', '', '',
             $data['udf5'] ?? '',
             $data['udf4'] ?? '',
             $data['udf3'] ?? '',
@@ -207,192 +217,16 @@ class PayuController extends Controller
             $data['firstname'] ?? '',
             $data['productinfo'] ?? '',
             $data['amount'] ?? '',
-            $txnid,
-            $key,
+            $data['txnid'] ?? '',
+            config('services.payu.key'),
         ];
 
-        $reverseHashString = implode('|', $reverseParts);
-
-        // Additional charges require a different reverse hash formula.
-        if (!empty($data['additional_charges'])) {
-            $reverseHashString =
-                $data['additional_charges'].'|'.$reverseHashString;
+        if (! empty($data['additionalCharges'])) {
+            array_unshift($parts, $data['additionalCharges']);
         }
 
-        $calculatedHash = strtolower(
-            hash('sha512', $reverseHashString)
-        );
+        $expected = strtolower(hash('sha512', implode('|', $parts)));
 
-        $receivedHash = strtolower($data['hash'] ?? '');
-
-        if (
-            !$receivedHash ||
-            !hash_equals($calculatedHash, $receivedHash)
-        ) {
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Invalid payment response hash.',
-            ];
-        }
-
-        // Verify customer and product details too.
-        $expectedFirstName = \Illuminate\Support\Str::before(
-            $order->name,
-            ' '
-        );
-
-        if (
-            ($data['email'] ?? '') !== $order->email ||
-            ($data['firstname'] ?? '') !== $expectedFirstName ||
-            ($data['productinfo'] ?? '') !== 'Numerology Report'
-        ) {
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Customer or product details mismatch.',
-            ];
-        }
-
-        // Only a successful callback proceeds to API verification.
-        if ($status !== 'success') {
-            $order->update([
-                'status' => $status === 'failure'
-                    ? 'failed'
-                    : 'pending',
-                'payu_response' => $data,
-            ]);
-
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Payment not successful.',
-            ];
-        }
-
-        return $this->verifyPaymentWithPayU($order, $data);
+        return hash_equals($expected, strtolower($data['hash']));
     }
-
-
-
-    private function verifyPaymentWithPayU(
-        PaymentOrder $order,
-        array $callbackData
-    ): array {
-
-        $key = config('services.payu.key');
-        $salt = config('services.payu.salt');
-
-        $command = 'verify_payment';
-        $txnid = $order->txnid;
-
-        $hash = strtolower(hash(
-            'sha512',
-            $key.'|'.$command.'|'.$txnid.'|'.$salt
-        ));
-
-        $endpoint = config('services.payu.mode') === 'live'
-            ? 'https://info.payu.in/merchant/postservice.php?form=2'
-            : 'https://test.payu.in/merchant/postservice?form=2';
-
-        try {
-            $response = Http::asForm()
-                ->timeout(30)
-                ->post($endpoint, [
-                    'key' => $key,
-                    'command' => $command,
-                    'var1' => $txnid,
-                    'hash' => $hash,
-                ]);
-
-            if (!$response->successful()) {
-                throw new \RuntimeException(
-                    'PayU verification API unavailable.'
-                );
-            }
-
-            $result = $response->json();
-
-            $transaction = data_get(
-                $result,
-                'transaction_details.'.$txnid
-            );
-
-            if (!$transaction) {
-                throw new \RuntimeException(
-                    'Transaction details not found.'
-                );
-            }
-
-            $verifiedAmount = $transaction['amt']
-                ?? $transaction['transaction_amount']
-                ?? null;
-
-            $amountMatches = $verifiedAmount !== null
-                && number_format((float) $verifiedAmount, 2, '.', '')
-                    === number_format((float) $order->amount, 2, '.', '');
-
-            $verified = strtolower(
-                $transaction['status'] ?? ''
-            ) === 'success';
-
-            $mihpayid = $transaction['mihpayid'] ?? null;
-
-            if (
-                $verified &&
-                $amountMatches &&
-                $mihpayid &&
-                (string) $mihpayid !== 'Not Found'
-            ) {
-                DB::transaction(function () use (
-                    $order,
-                    $transaction,
-                    $callbackData
-                ) {
-                    $lockedOrder = PaymentOrder::whereKey($order->id)
-                        ->lockForUpdate()
-                        ->firstOrFail();
-
-                    if ($lockedOrder->status !== 'paid') {
-                        $lockedOrder->update([
-                            'status' => 'paid',
-                            'mihpayid' => $transaction['mihpayid'],
-                            'bank_ref_num' => $transaction['bank_ref_num'] ?? null,
-                            'payu_response' => [
-                                'callback' => $callbackData,
-                                'verification' => $transaction,
-                            ],
-                        ]);
-                    }
-                });
-
-                return [
-                    'success' => true,
-                    'order_id' => $order->id,
-                    'redirect' => route('payment.result', $order->id),
-                    'message' => 'Payment successfully verified.',
-                ];
-            }
-
-            // Don't mark as failed solely because the verification
-            // API returns pending or an amount mismatch.
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Payment is awaiting final verification.',
-            ];
-
-        } catch (\Throwable $e) {
-
-            report($e);
-
-            return [
-                'success' => false,
-                'order_id' => $order->id,
-                'message' => 'Unable to verify payment. Please try again.',
-            ];
-        }
-    }
-
-
 }

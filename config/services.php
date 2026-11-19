@@ -38,7 +38,11 @@ return [
     'payu' => [
         'key' => env('PAYU_KEY'),
         'salt' => env('PAYU_SALT'),
-        'mode' => env('PAYU_MODE', 'test'),
+        'environment' => env('PAYU_ENV', 'production'),
+
+    'bolt_script' => 'https://jssdk.payu.in/bolt/bolt.min.js',
+
+    'verify_url' => 'https://info.payu.in/merchant/postservice.php?form=2',
     ],
 
 ];

@@ -9,7 +9,7 @@ class LpController extends Controller
 {
     function nameReport(){
         $Mrp = 1999;
-        $Price = 699;
+        $Price = 1;
         $pageinfo =[
             'mrp'=>$Mrp,
             'price'=>$Price,
